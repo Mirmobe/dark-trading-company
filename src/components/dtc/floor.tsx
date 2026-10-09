@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { PACKS, getCard, getPack } from "@/lib/dtc/catalog";
 import { compactAge, expectedValue, gainPct, money, topSlab } from "@/lib/dtc/engine";
 import { useDesk } from "@/lib/dtc/store";
@@ -13,6 +14,10 @@ export function Floor({ onOpenPacks }: { onOpenPacks: () => void }) {
   }, null as ReturnType<typeof getCard> | null);
 
   const tape = feed.slice(0, 10);
+  const [clock, setClock] = useState<number | null>(null);
+  useEffect(() => {
+    setClock(Date.now());
+  }, []);
 
   return (
     <div className="flex flex-col gap-10">
@@ -61,7 +66,7 @@ export function Floor({ onOpenPacks }: { onOpenPacks: () => void }) {
                   {gain >= 0 ? "+" : ""}
                   {gain.toFixed(0)}%
                 </span>
-                <span className="text-muted"> · {compactAge(item.at)}</span>
+                <span className="text-muted"> · {clock ? compactAge(item.at, clock) : "live"}</span>
               </p>
             );
           })}
