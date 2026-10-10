@@ -4,6 +4,48 @@ import { buybackQuote, gainPct, money, verifyPull } from "@/lib/dtc/engine";
 import { pullPost, xIntent } from "@/lib/dtc/links";
 import { useDesk } from "@/lib/dtc/store";
 import { SlabFace } from "@/components/dtc/slab";
+const MOTES = [
+  ["12%", "22%", "0ms"],
+  ["22%", "70%", "180ms"],
+  ["78%", "18%", "90ms"],
+  ["84%", "58%", "320ms"],
+  ["48%", "12%", "40ms"],
+  ["36%", "78%", "260ms"],
+  ["64%", "40%", "140ms"],
+  ["8%", "46%", "400ms"],
+  ["92%", "36%", "220ms"],
+  ["54%", "84%", "300ms"],
+  ["30%", "34%", "60ms"],
+  ["70%", "76%", "160ms"],
+] as const;
+
+function VoidSpectacle({ leaving }: { leaving?: boolean }) {
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+      {leaving ? null : (
+        <img src="/hyperspace.jpg" alt="" className="void-hyper absolute inset-0 h-full w-full object-cover" />
+      )}
+      <img
+        src="/reaper.jpg"
+        alt=""
+        className={
+          leaving
+            ? "reaper-leave absolute bottom-0 left-1/2 h-full w-auto max-w-none"
+            : "void-reaper absolute bottom-0 left-1/2 w-auto max-w-none"
+        }
+      />
+      {leaving
+        ? null
+        : MOTES.map(([left, top, delay]) => (
+            <span
+              key={`${left}-${top}`}
+              className="mote absolute h-0.5 w-0.5 rounded-full bg-ivory"
+              style={{ left, top, animationDelay: delay }}
+            />
+          ))}
+    </div>
+  );
+}
 
 export function Reveal() {
   const opening = useDesk((s) => s.opening);
@@ -16,7 +58,7 @@ export function Reveal() {
   useEffect(() => {
     if (!opening || opening.stage !== "sealed") return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const timer = window.setTimeout(() => showOpening(), reduce ? 240 : 1100);
+    const timer = window.setTimeout(() => showOpening(), reduce ? 280 : 3600);
     return () => window.clearTimeout(timer);
   }, [opening, showOpening]);
 
@@ -44,21 +86,23 @@ export function Reveal() {
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/92 p-4 md:items-center" role="dialog" aria-modal>
-      <div className="max-h-full w-full max-w-5xl overflow-y-auto rounded-slab border border-line bg-ink p-4 md:p-6">
-        {opening.stage === "sealed" || !pack ? (
-          <div className="pack-shake px-2 py-10 text-center">
+    <div className="fixed inset-0 z-50 bg-ink" role="dialog" aria-modal>
+      {opening.stage === "sealed" || !pack ? (
+        <div className="relative h-full w-full overflow-hidden">
+          <VoidSpectacle />
+          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-ink via-ink/80 to-transparent px-6 pt-24 pb-10 text-center">
             <p className="text-xs tracking-seal text-brass uppercase">Seal locked</p>
             <h2 className="mt-3 font-serif text-4xl text-ivory">{pack?.name ?? "Machine"}</h2>
             <p className="mx-auto mt-3 max-w-md text-sm text-muted">
-              {slabs.length} commit{slabs.length === 1 ? "" : "s"} fixed. The flip cannot change them.
+              {slabs.length} commit{slabs.length === 1 ? "" : "s"} fixed in the dark. The flip cannot change them.
             </p>
-            <p className="num mx-auto mt-4 max-w-lg truncate text-xs text-brass-deep">
-              {slabs[0]?.commitment}
-            </p>
+            <p className="num mx-auto mt-4 max-w-lg truncate text-xs text-brass-deep">{slabs[0]?.commitment}</p>
           </div>
-        ) : (
-          <div>
+        </div>
+      ) : (
+        <div className="relative flex h-full items-end justify-center overflow-y-auto p-4 md:items-center">
+          <VoidSpectacle leaving />
+          <div className="relative z-10 max-h-full w-full max-w-5xl">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs tracking-seal text-brass uppercase">{pack.name}</p>
@@ -115,8 +159,8 @@ export function Reveal() {
               })}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
