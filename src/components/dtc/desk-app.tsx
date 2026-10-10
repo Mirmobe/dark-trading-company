@@ -37,8 +37,8 @@ export function DeskApp() {
   }, [hydrate]);
 
   return (
-    <div className="min-h-screen overflow-x-hidden pb-24 md:pb-8">
-      <header className="sticky top-0 z-40 border-b border-brass/40 bg-ink/95 backdrop-blur">
+    <div className="relative z-10 min-h-screen overflow-x-hidden pb-24 md:pb-8">
+      <header className="sticky top-0 z-40 border-b border-brass/40 bg-ink/70 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-4 py-3">
           <button type="button" onClick={() => setView("floor")} className="flex items-center gap-3 text-left">
             <span className="grid h-10 w-10 place-items-center border border-brass font-serif text-xl text-brass">
@@ -100,7 +100,7 @@ export function DeskApp() {
         </footer>
       </main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-ink md:hidden">
+      <nav className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-line bg-ink/75 backdrop-blur md:hidden">
         {NAV.map((item) => (
           <button
             key={item.id}

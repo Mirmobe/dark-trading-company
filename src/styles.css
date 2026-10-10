@@ -25,11 +25,24 @@
   body {
     margin: 0;
     min-height: 100vh;
-    background: var(--color-ink);
+    background-color: var(--color-ink);
+    background-image: url("/glade.jpg");
+    background-position: center;
+    background-size: cover;
+    background-attachment: fixed;
     color: var(--color-ivory);
     font-family: var(--font-sans);
     font-weight: 400;
     line-height: 1.5;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, rgb(16 14 12 / 0.28), rgb(16 14 12 / 0.18) 42%, rgb(16 14 12 / 0.4));
   }
 
   h1,
@@ -61,10 +74,6 @@
 }
 
 @layer components {
-  .num {
-    font-variant-numeric: tabular-nums;
-  }
-
   .seal-spin {
     animation: seal-spin 14s linear infinite;
   }
@@ -261,4 +270,17 @@
     filter: blur(18px);
     transform: translateX(-50%) scale(1.14);
   }
+}
+
+.bg-surface,
+.bg-raised {
+  backdrop-filter: blur(10px);
+}
+
+.bg-surface {
+  background-color: rgb(26 22 18 / 0.72);
+}
+
+.bg-raised {
+  background-color: rgb(38 32 25 / 0.78);
 }
