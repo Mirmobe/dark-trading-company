@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { Cast } from "@/components/dtc/cast";
 import { Floor } from "@/components/dtc/floor";
 import { Packs } from "@/components/dtc/packs";
@@ -64,6 +65,9 @@ export function DeskApp() {
               </button>
             ))}
           </nav>
+          <Link to="/tune" className="min-h-11 px-2 text-sm text-brass md:px-3">
+            Gratz
+          </Link>
           <div className="ml-auto flex items-center gap-2">
             <p className="num text-right text-xs leading-tight text-ivory">
               <span className="block">{money(usdc)}</span>
