@@ -118,8 +118,8 @@ export function GratzTune() {
           </div>
         </div>
       ) : (
-        <div className="relative z-10 flex h-full min-h-0 flex-col">
-          <header className="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
+        <div className="relative z-10 h-full">
+          <header className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 px-4 py-3">
             <Link to="/" className="min-h-11 text-sm text-ivory">
               Desk
             </Link>
@@ -139,36 +139,39 @@ export function GratzTune() {
             </button>
           </header>
 
-          <div className="flex min-h-0 flex-1 items-center justify-center px-4">
-            <div className="hole-open soundhole relative aspect-square h-full max-w-full overflow-hidden rounded-full border border-brass/50">
-            <img src="/soundhole.jpg" alt="" className="absolute inset-0 h-full w-full object-cover" />
-            <div className="string-row absolute inset-0 flex justify-evenly">
-              {STRING_NAMES.map((name, index) => {
-                const freq = stringFreq(STRING_MIDIS[index], reference);
-                const hot = active === index;
-                return (
-                  <button
-                    key={name + index}
-                    type="button"
-                    onClick={() => playString(index)}
-                    className="group relative flex h-full w-8 flex-col items-center justify-between py-3"
-                    aria-label={`Pluck ${name} at ${freq.toFixed(1)} hertz`}
-                  >
-                    <span className={`text-xs ${hot ? "text-brass" : "text-ivory"}`}>{name}</span>
-                    <span
-                      key={pings[index]}
-                      className="string-ping string-line absolute w-px bg-ivory"
-                      style={{ width: `${3.5 - index * 0.35}px`, opacity: hot ? 1 : 0.75 }}
-                    />
-                    <span className="num text-xs text-ivory/80">{freq.toFixed(0)}</span>
-                  </button>
-                );
-              })}
-            </div>
+          <div className="flex h-full items-center justify-center">
+            <div className="hole-open soundhole relative aspect-square overflow-hidden rounded-full border border-brass/50">
+              <img src="/soundhole.jpg" alt="" className="absolute inset-0 h-full w-full object-cover" />
+              <div className="string-row absolute inset-0 flex">
+                {STRING_NAMES.map((name, index) => {
+                  const freq = stringFreq(STRING_MIDIS[index], reference);
+                  const hot = active === index;
+                  return (
+                    <button
+                      key={name + index}
+                      type="button"
+                      onClick={() => playString(index)}
+                      onPointerEnter={(event) => {
+                        if (event.buttons === 1) playString(index);
+                      }}
+                      className="relative flex h-full min-h-11 flex-1 flex-col items-center pt-16"
+                      aria-label={`Pluck ${name} at ${freq.toFixed(1)} hertz`}
+                    >
+                      <span className={`text-xs ${hot ? "text-brass" : "text-ivory"}`}>{name}</span>
+                      <span className="num text-xs text-ivory/80">{freq.toFixed(1)}</span>
+                      <span
+                        key={pings[index]}
+                        className="string-ping string-line absolute bg-ivory"
+                        style={{ width: `${3.6 - index * 0.38}px`, opacity: hot ? 1 : 0.8 }}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
-          <div className="mx-auto w-full max-w-md shrink-0 px-4 pt-3 pb-4">
+          <div className="absolute inset-x-0 bottom-0 z-20 mx-auto w-full max-w-md px-4 pt-3 pb-4">
             <div className="flex gap-2">
               {([432, 428] as const).map((hz) => (
                 <button

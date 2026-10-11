@@ -65,8 +65,8 @@ export function DeskApp() {
               </button>
             ))}
           </nav>
-          <Link to="/tune" className="min-h-11 px-2 text-sm text-brass md:px-3">
-            Gratz
+          <Link to="/tune" className="min-h-11 shrink-0 px-2 text-sm text-brass md:px-3">
+            Gratz-Tune
           </Link>
           <div className="ml-auto flex items-center gap-2">
             <p className="num text-right text-xs leading-tight text-ivory">

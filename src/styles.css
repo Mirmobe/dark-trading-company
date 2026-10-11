@@ -292,8 +292,8 @@
 }
 
 .soundhole {
-  width: auto;
-  max-width: min(92vw, 100%);
+  width: min(96vw, 92vh);
+  max-width: 96vw;
 }
 
 .string-row {
