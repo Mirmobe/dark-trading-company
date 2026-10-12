@@ -14,9 +14,9 @@ export function pullPost(input: {
   gain: string;
 }): string {
   return [
-    `Broke a ${input.packName} seal at Dark Trading Company.`,
-    `Pulled ${input.cardName} (${input.grade}) — index ${input.indexed}, ${input.gain} vs the pack.`,
-    `Original vault slabs. Commit-reveal before the flip. Solana desk.`,
+    `Broke a ${input.packName} sack at Dark Trading Company.`,
+    `Pulled ${input.cardName} (${input.grade}) — index ${input.indexed}, ${input.gain} vs the sack.`,
+    `Real mineral specimens. A vein win is a real crystal when claims open.`,
     X_TAGS,
   ].join("\n");
 }

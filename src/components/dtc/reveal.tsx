@@ -19,6 +19,26 @@ const MOTES = [
   ["70%", "76%", "160ms"],
 ] as const;
 
+function GhostChomp() {
+  return (
+    <svg viewBox="0 0 200 180" className="ghost-chomp pointer-events-none absolute bottom-[6%] left-[4%] z-20 w-[min(46%,28rem)]" aria-hidden>
+      <path
+        d="M24 78c0-42 34-64 76-64s76 22 76 64v62l-16-12-14 12-14-12-14 12-14-12-14 12-14-12-14 12-16-12-16 12V78Z"
+        fill="#3ec0ff"
+        stroke="#14120c"
+        strokeWidth="7"
+        strokeLinejoin="round"
+      />
+      <circle cx="78" cy="72" r="11" fill="#14120c" />
+      <circle cx="128" cy="72" r="11" fill="#14120c" />
+      <circle cx="82" cy="68" r="4" fill="#fff" />
+      <circle cx="132" cy="68" r="4" fill="#fff" />
+      <path className="ghost-jaw" d="M58 98h88l-12 32H72Z" fill="#14120c" />
+      <path className="ghost-jaw" d="M80 116h44l-6 12H86Z" fill="#ff4d6d" />
+    </svg>
+  );
+}
+
 function VoidSpectacle({ leaving }: { leaving?: boolean }) {
   return (
     <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
@@ -30,7 +50,7 @@ function VoidSpectacle({ leaving }: { leaving?: boolean }) {
         alt=""
         className={
           leaving
-            ? "reaper-leave absolute bottom-0 left-1/2 h-full w-auto max-w-none"
+            ? "reaper-eaten absolute bottom-0 left-1/2 h-full w-auto max-w-none"
             : "void-reaper absolute bottom-0 left-1/2 w-auto max-w-none"
         }
       />
@@ -61,6 +81,13 @@ export function Reveal() {
     const timer = window.setTimeout(() => showOpening(), reduce ? 280 : 3600);
     return () => window.clearTimeout(timer);
   }, [opening, showOpening]);
+
+  useEffect(() => {
+    if (!opening || opening.stage !== "open") return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const timer = window.setTimeout(() => dismissOpening(), reduce ? 1200 : 4600);
+    return () => window.clearTimeout(timer);
+  }, [opening, dismissOpening]);
 
   useEffect(() => {
     if (!opening || opening.stage !== "open") return;
@@ -102,15 +129,11 @@ export function Reveal() {
       ) : (
         <div className="relative flex h-full items-end justify-center overflow-y-auto p-4 md:items-center">
           <VoidSpectacle leaving />
+          <GhostChomp />
           <div className="relative z-10 max-h-full w-full max-w-5xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs tracking-seal text-brass uppercase">{pack.name}</p>
-                <h2 className="font-serif text-3xl text-ivory">The seal broke.</h2>
-              </div>
-              <button type="button" onClick={dismissOpening} className="min-h-11 px-3 text-sm text-ivory">
-                Close
-              </button>
+            <div>
+              <p className="text-xs tracking-seal text-brass uppercase">{pack.name}</p>
+              <h2 className="font-serif text-4xl text-ivory">You cracked it.</h2>
             </div>
             <div className={`mt-5 grid gap-4 ${slabs.length > 1 ? "sm:grid-cols-2 lg:grid-cols-3" : "mx-auto max-w-xs"}`}>
               {slabs.map((slab, index) => {

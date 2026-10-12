@@ -2,37 +2,12 @@ import { RARITY_LABEL } from "@/lib/dtc/catalog";
 import type { CardDef } from "@/lib/dtc/types";
 
 export function Monogram({ motif }: { motif: CardDef["motif"] }) {
-  const common = "stroke-brass fill-none";
-  if (motif === "ember") {
-    return (
-      <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden>
-        <path d="M32 8 52 32 32 56 12 32Z" className={common} strokeWidth="1.4" />
-        <path d="M32 20 44 32 32 44 20 32Z" className={common} strokeWidth="1.4" />
-        <path d="M32 28v12" className={common} strokeWidth="1.4" />
-      </svg>
-    );
-  }
-  if (motif === "eclipse") {
-    return (
-      <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden>
-        <circle cx="28" cy="32" r="14" className={common} strokeWidth="1.4" />
-        <circle cx="38" cy="32" r="14" className={common} strokeWidth="1.4" />
-        <path d="M32 14v36" className={common} strokeWidth="1.2" />
-      </svg>
-    );
-  }
-  if (motif === "ash") {
-    return (
-      <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden>
-        <path d="M14 18h22M14 18v22M50 46H28M50 46V24" className={common} strokeWidth="1.4" />
-        <path d="M24 32h16" className={common} strokeWidth="1.4" />
-      </svg>
-    );
-  }
+  const fill = motif === "ember" ? "#ff8a3d" : motif === "eclipse" ? "#3ec0ff" : motif === "ash" ? "#f3eadf" : "#ffe14a";
   return (
     <svg viewBox="0 0 64 64" className="h-full w-full" aria-hidden>
-      <rect x="16" y="14" width="32" height="36" className={common} strokeWidth="1.4" />
-      <path d="M22 24h20M22 32h20M22 40h12" className={common} strokeWidth="1.4" />
+      <path d="M32 4 54 26 32 60 10 26Z" fill={fill} stroke="#14120c" strokeWidth="3.5" strokeLinejoin="round" />
+      <path d="M10 26h44" stroke="#14120c" strokeWidth="3" />
+      <path d="M32 4 22 26 32 60 42 26Z" fill="#fff" opacity="0.45" />
     </svg>
   );
 }

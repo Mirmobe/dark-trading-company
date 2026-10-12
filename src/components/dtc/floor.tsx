@@ -23,13 +23,13 @@ export function Floor({ onOpenPacks }: { onOpenPacks: () => void }) {
     <div className="flex flex-col gap-10">
       <section className="grid items-end gap-8 lg:grid-cols-2">
         <div>
-          <p className="text-xs tracking-seal text-brass uppercase">Solana paper desk · original slabs</p>
+          <p className="text-xs tracking-seal text-brass uppercase">Real specimens · paper desk until claims open</p>
           <h1 className="mt-3 max-w-xl font-serif text-5xl leading-none text-ivory md:text-6xl">
-            Open the night desk.
+            Crack a crystal.
           </h1>
           <p className="mt-4 max-w-xl text-base text-muted">
-            Dark Trading Company seals original vault slabs — contracts, bells, and one ruined exchange.
-            Lock a commit, flip the card, then hold it, sell it back, or throw it in the pit.
+            The sacks are real rocks: quartz, pyrite, geodes, opal. A vein pull is a real crystal when claims
+            open. Until then you play in paper, see the odds, and keep the specimen in the vault.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <button
@@ -37,7 +37,7 @@ export function Floor({ onOpenPacks }: { onOpenPacks: () => void }) {
               onClick={onOpenPacks}
               className="min-h-11 bg-brass px-5 text-sm font-medium tracking-wide text-ink"
             >
-              Choose a machine
+              Choose a sack
             </button>
             <p className="flex min-h-11 items-center text-sm text-muted">You start with 500 paper USDC.</p>
           </div>
@@ -105,10 +105,10 @@ export function Floor({ onOpenPacks }: { onOpenPacks: () => void }) {
 
       <section className="grid gap-3 md:grid-cols-4">
         {[
-          ["Hold", "The slab stays in your vault. Index is a mark, not a bid."],
+          ["Hold", "The specimen stays in your vault. The index is a mark, not a shop price."],
           ["Buy back", "Inside the window, the desk pays a published percent of index in paper USDC."],
-          ["The pit", "List any vaulted slab. Other desks are already asking."],
-          ["Ticket", "Cut a vault ticket and pull it off the tape. Nothing physical ships from this demo."],
+          ["The pit", "List any vaulted rock. Other desks are already asking."],
+          ["Real crystal", "Vein wins are real specimens when claims open. This paper desk does not ship one yet."],
         ].map(([title, copy]) => (
           <article key={title} className="border-t border-line pt-3">
             <h3 className="font-serif text-2xl text-ivory">{title}</h3>
@@ -120,10 +120,10 @@ export function Floor({ onOpenPacks }: { onOpenPacks: () => void }) {
       <section className="rounded-slab border border-line bg-surface p-5">
         <h2 className="font-serif text-3xl text-ivory">What you are actually holding</h2>
         <p className="mt-3 max-w-3xl text-sm text-muted">
-          This is a paper desk in your browser. Balances are not USDC on Solana and these slabs are original
-          fiction — not graded cards from any other company, and not affiliated with Jupiter. Odds and index
-          values are printed before you pay. A Phantom signature, when you choose it, witnesses the commit. It
-          does not move funds.
+          The names are real minerals. The balance is paper, not USDC on Solana, and a pull does not mail a
+          rock yet. Vein-tier wins are the ones that become real crystals when claims open. Odds and index
+          values are printed before you pay. A Phantom signature witnesses the commit. It does not move funds.
+          Not affiliated with Jupiter.
         </p>
       </section>
     </div>

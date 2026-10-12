@@ -120,6 +120,9 @@
   .void-reaper,
   .mote,
   .reaper-leave,
+  .reaper-eaten,
+  .ghost-chomp,
+  .ghost-jaw,
   .hole-open,
   .string-ping {
     animation: none !important;
@@ -360,4 +363,77 @@
   background:
     radial-gradient(circle at 50% 50%, transparent 0 16%, rgba(224, 168, 92, 0.9) 16% 17.2%, transparent 17.2% 18%),
     repeating-radial-gradient(circle at 50% 50%, #1a1612 0 2px, #0c0b0a 2px 3px);
+}
+
+button,
+a.inline-flex {
+  background: #ffe14a !important;
+  color: #14120c !important;
+  font-weight: 800 !important;
+  font-size: 1.05rem !important;
+  line-height: 1.15 !important;
+  border: 3px solid #14120c !important;
+  border-radius: 1rem !important;
+  box-shadow: 4px 4px 0 #14120c !important;
+}
+
+button *,
+a.inline-flex * {
+  color: #14120c !important;
+}
+
+button:disabled {
+  opacity: 0.45;
+}
+
+button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 #14120c !important;
+}
+
+.ghost-chomp {
+  animation: ghost-pop 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.ghost-jaw {
+  transform-origin: 102px 98px;
+  animation: ghost-jaw 1.5s ease-in-out 0.35s both;
+}
+
+.reaper-eaten {
+  height: 100%;
+  transform-origin: 30% 42%;
+  animation: reaper-eaten 1.7s ease-in 0.25s both;
+}
+
+@keyframes ghost-pop {
+  from {
+    transform: translateX(-46%) scale(0.7);
+  }
+  to {
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes ghost-jaw {
+  0% {
+    transform: scaleY(0.25);
+  }
+  40% {
+    transform: scaleY(1);
+  }
+  100% {
+    transform: scaleY(0.4);
+  }
+}
+
+@keyframes reaper-eaten {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-130%) translateY(18%) scale(0.04);
+  }
 }
