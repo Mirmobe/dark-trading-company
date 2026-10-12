@@ -24,9 +24,21 @@ import {
   type Instrument,
 } from "@/lib/gratz/voices";
 import { xIntent } from "@/lib/dtc/links";
+import {
+  beginLoopCapture,
+  endLoopCapture,
+  hasLoop,
+  isLooping,
+  loopDuration,
+  loopPlayhead,
+  pauseLoop,
+  scratchBy,
+  startLoop,
+  stopLoop,
+} from "@/lib/gratz/deck";
 
 type Phase = "walk" | "hole";
-type Mode = "guitar" | "tuner" | "together";
+type Mode = "guitar" | "tuner" | "together" | "deck";
 
 const CIRCLE = ["Guitar", "Piano", "Flute", "Trumpet", "Drums"] as const;
 
@@ -84,6 +96,8 @@ export function GratzTune() {
   const [seconds, setSeconds] = useState(0);
   const [take, setTake] = useState<Blob | null>(null);
   const [shareNote, setShareNote] = useState<string | null>(null);
+  const [loopPhase, setLoopPhase] = useState<"idle" | "arm" | "play">("idle");
+  const [hasTake, setHasTake] = useState(false);
   const stopRef = useRef(0);
   const streamRef = useRef<MediaStream | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -102,6 +116,9 @@ export function GratzTune() {
   const micTap = useRef<(() => void) | null>(null);
   const dragX = useRef<number | null>(null);
   const swiped = useRef(false);
+  const platterRef = useRef<HTMLDivElement>(null);
+  const lastDisc = useRef<number | null>(null);
+  const resumeScratch = useRef(false);
   modeRef.current = mode;
   instrumentRef.current = instrument;
   chordRef.current = chord;
@@ -119,8 +136,22 @@ export function GratzTune() {
       timers.current.forEach((id) => window.clearTimeout(id));
       micTap.current?.();
       recRef.current?.stop();
+      stopLoop();
     };
   }, []);
+
+  useEffect(() => {
+    if (mode !== "deck" && loopPhase !== "play") return;
+    let frame = 0;
+    const tick = () => {
+      const disc = platterRef.current;
+      const duration = loopDuration();
+      if (disc && duration > 0) disc.style.transform = `rotate(${(loopPlayhead() / duration) * 360}deg)`;
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [mode, loopPhase]);
 
   useEffect(() => {
     if (!recording) return;
@@ -299,6 +330,72 @@ export function GratzTune() {
     setRing(null);
   }
 
+  function onLoop() {
+    armAudio();
+    if (loopPhase === "arm") {
+      const duration = endLoopCapture();
+      if (duration <= 0) {
+        setLoopPhase("idle");
+        setShareNote("Play a little first, then close the loop.");
+        return;
+      }
+      startLoop(0);
+      setHasTake(true);
+      setLoopPhase("play");
+      setShareNote(null);
+      return;
+    }
+    if (loopPhase === "play") {
+      pauseLoop();
+      setLoopPhase("idle");
+      return;
+    }
+    if (hasTake) {
+      startLoop(0);
+      setLoopPhase("play");
+      return;
+    }
+    beginLoopCapture();
+    setLoopPhase("arm");
+    setShareNote("Playing into the loop. Close it when the phrase is done.");
+  }
+
+  function recutLoop() {
+    armAudio();
+    stopLoop();
+    beginLoopCapture();
+    setLoopPhase("arm");
+    setShareNote("Playing into a new loop.");
+  }
+
+  function discAngle(event: ReactPointerEvent<HTMLDivElement>) {
+    const rect = event.currentTarget.getBoundingClientRect();
+    return Math.atan2(event.clientX - (rect.left + rect.width / 2), -(event.clientY - (rect.top + rect.height / 2)));
+  }
+
+  function beginScratch(event: ReactPointerEvent<HTMLDivElement>) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    lastDisc.current = discAngle(event);
+    resumeScratch.current = isLooping();
+    if (isLooping()) pauseLoop();
+  }
+
+  function moveScratch(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId) || lastDisc.current == null) return;
+    const angle = discAngle(event);
+    let delta = angle - lastDisc.current;
+    if (delta > Math.PI) delta -= Math.PI * 2;
+    if (delta < -Math.PI) delta += Math.PI * 2;
+    lastDisc.current = angle;
+    const duration = loopDuration() || 2;
+    scratchBy((delta / (Math.PI * 2)) * duration);
+  }
+
+  function endScratch() {
+    lastDisc.current = null;
+    if (resumeScratch.current && hasLoop()) startLoop(loopPlayhead());
+  }
+
   async function listen() {
     setMicError(null);
     const session = ++stopRef.current;
@@ -469,7 +566,7 @@ export function GratzTune() {
             <div className="text-center">
               <p className="text-xs tracking-seal text-brass uppercase">Gratz-Tune</p>
               <h1 className="font-serif text-2xl">
-                {mode === "tuner" ? "Tune" : mode === "together" ? "Circle" : instrument === "piano" ? "Keys" : instrument === "drums" ? "Kit" : instrument === "flute" ? "Flute" : instrument === "trumpet" ? "Horn" : "Strum"}
+                {mode === "tuner" ? "Tune" : mode === "deck" ? "Deck" : mode === "together" ? "Circle" : instrument === "piano" ? "Keys" : instrument === "drums" ? "Kit" : instrument === "flute" ? "Flute" : instrument === "trumpet" ? "Horn" : "Strum"}
               </h1>
             </div>
             <button
@@ -485,7 +582,25 @@ export function GratzTune() {
           </header>
 
           <div className="hole-fit px-4">
-            {mode === "together" ? (
+            {mode === "deck" ? (
+              <div
+                className="soundhole relative aspect-square touch-none overflow-hidden rounded-full border border-brass/60"
+                onPointerDown={beginScratch}
+                onPointerMove={moveScratch}
+                onPointerUp={endScratch}
+                onPointerCancel={endScratch}
+              >
+                <div ref={platterRef} className="platter absolute inset-0 rounded-full">
+                  <div className="absolute top-1/2 left-1/2 flex h-[34%] w-[34%] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full bg-brass text-center text-ink">
+                    <p className="font-serif text-2xl">Gratz</p>
+                    <p className="text-xs">
+                      {loopPhase === "arm" ? "Recording" : loopPhase === "play" ? "Looping" : hasTake ? "Scratch" : "No take"}
+                    </p>
+                  </div>
+                </div>
+                <span className="pointer-events-none absolute top-[6%] left-1/2 h-[16%] w-0.5 -translate-x-1/2 bg-ivory" />
+              </div>
+            ) : mode === "together" ? (
               <div
                 ref={ringRef}
                 className="soundhole relative aspect-square touch-none overflow-hidden rounded-full border border-brass/50"
@@ -642,6 +757,27 @@ export function GratzTune() {
             <div className="mx-auto mt-2 flex w-full max-w-3xl gap-2">
               <button
                 type="button"
+                onClick={onLoop}
+                className={`min-h-11 flex-1 text-sm ${loopPhase === "idle" ? "border border-line text-ivory" : "bg-brass text-ink"}`}
+              >
+                {loopPhase === "arm" ? "Close loop" : loopPhase === "play" ? "Stop loop" : hasTake ? "Play loop" : "Loop"}
+              </button>
+              {hasTake && loopPhase !== "arm" ? (
+                <button type="button" onClick={recutLoop} className="min-h-11 flex-1 border border-line text-sm text-ivory">
+                  Recut
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => useMode("deck")}
+                className={`min-h-11 flex-1 text-sm ${mode === "deck" ? "bg-brass text-ink" : "border border-line text-ivory"}`}
+              >
+                Deck
+              </button>
+            </div>
+            <div className="mx-auto mt-2 flex w-full max-w-3xl gap-2">
+              <button
+                type="button"
                 onClick={() => useMode("together")}
                 className={`min-h-11 flex-1 text-sm ${mode === "together" ? "bg-brass text-ink" : "border border-line text-ivory"}`}
               >
@@ -691,7 +827,7 @@ export function GratzTune() {
               </button>
             </div>
             {shareNote ? <p className="mx-auto mt-2 max-w-3xl text-xs text-brass">{shareNote}</p> : null}
-            {mode !== "tuner" ? (
+            {mode === "deck" ? null : mode !== "tuner" ? (
               <div
                 className="mx-auto mt-3 w-full max-w-3xl rounded-slab border border-line bg-ink/70 px-3 py-3 backdrop-blur"
                 onPointerDown={(event) => {

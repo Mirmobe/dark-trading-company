@@ -348,3 +348,9 @@
     transform: translateX(0);
   }
 }
+
+.platter {
+  background:
+    radial-gradient(circle at 50% 50%, transparent 0 16%, rgba(224, 168, 92, 0.9) 16% 17.2%, transparent 17.2% 18%),
+    repeating-radial-gradient(circle at 50% 50%, #1a1612 0 2px, #0c0b0a 2px 3px);
+}

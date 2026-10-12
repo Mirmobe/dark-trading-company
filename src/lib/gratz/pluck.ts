@@ -18,9 +18,14 @@ function graph() {
   return { audio, master, capture };
 }
 
-export function withBus() {
-  const { audio, master } = graph();
+export function outputs() {
+  const { audio, master, capture } = graph();
   void audio.resume();
+  return { audio, master, capture };
+}
+
+export function withBus() {
+  const { audio, master } = outputs();
   return { audio, master };
 }
 
