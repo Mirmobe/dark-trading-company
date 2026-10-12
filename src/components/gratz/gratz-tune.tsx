@@ -26,7 +26,9 @@ import {
 import { xIntent } from "@/lib/dtc/links";
 
 type Phase = "walk" | "hole";
-type Mode = "guitar" | "tuner";
+type Mode = "guitar" | "tuner" | "together";
+
+const CIRCLE = ["Guitar", "Piano", "Flute", "Trumpet", "Drums"] as const;
 
 const PAGE = 10;
 
@@ -76,6 +78,7 @@ export function GratzTune() {
   const [micError, setMicError] = useState<string | null>(null);
   const [walkKey, setWalkKey] = useState(0);
   const [pick, setPick] = useState<number | null>(null);
+  const [ring, setRing] = useState<number | null>(null);
   const [page, setPage] = useState(0);
   const [recording, setRecording] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -84,6 +87,9 @@ export function GratzTune() {
   const stopRef = useRef(0);
   const streamRef = useRef<MediaStream | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
+  const ringRef = useRef<HTMLDivElement>(null);
+  const lastRing = useRef<number | null>(null);
+  const lastTurns = useRef<number | null>(null);
   const lastStrum = useRef<number | null>(null);
   const timers = useRef<number[]>([]);
   const modeRef = useRef(mode);
@@ -188,6 +194,84 @@ export function GratzTune() {
     setPick(null);
   }
 
+  function voicedMidis() {
+    return CHORDS[chordRef.current].frets.flatMap((fret, index) => (fret < 0 ? [] : [STRING_MIDIS[index] + fret]));
+  }
+
+  function circleSteps(sector: number) {
+    if (sector === 4) return 6;
+    if (sector === 2 || sector === 3) return 8;
+    return Math.max(1, voicedMidis().length);
+  }
+
+  function playCircle(sector: number, step: number) {
+    const tuning = referenceRef.current;
+    const name = CHORDS[chordRef.current].name;
+    const voiced = voicedMidis();
+    if (sector === 0) pluck(stringFreq(voiced[step % voiced.length], tuning), 0.22);
+    else if (sector === 1) playPiano(stringFreq(voiced[step % voiced.length] + 12, tuning));
+    else if (sector === 2) playFlute(stringFreq(windMidis(name, "flute")[step % 8], tuning));
+    else if (sector === 3) playTrumpet(stringFreq(windMidis(name, "trumpet")[step % 8], tuning));
+    else playDrum(step % 6);
+    setRing(sector);
+  }
+
+  function cellAt(turns: number) {
+    const wrapped = ((turns % 1) + 1) % 1;
+    const sector = Math.min(4, Math.floor(wrapped * 5));
+    const steps = circleSteps(sector);
+    const step = Math.min(steps - 1, Math.floor((wrapped * 5 - sector) * steps));
+    return { sector, step, token: sector * 20 + step };
+  }
+
+  function rubAt(turns: number) {
+    const cell = cellAt(turns);
+    if (lastRing.current === cell.token) return;
+    lastRing.current = cell.token;
+    playCircle(cell.sector, cell.step);
+  }
+
+  function rub(clientX: number, clientY: number) {
+    const ringEl = ringRef.current;
+    if (!ringEl) return;
+    const rect = ringEl.getBoundingClientRect();
+    const dx = clientX - (rect.left + rect.width / 2);
+    const dy = clientY - (rect.top + rect.height / 2);
+    const dist = Math.hypot(dx, dy);
+    const radius = rect.width / 2;
+    if (dist < radius * 0.28 || dist > radius) return;
+    let turns = Math.atan2(dx, -dy) / (Math.PI * 2);
+    if (turns < 0) turns += 1;
+    const previous = lastTurns.current;
+    if (previous == null) {
+      rubAt(turns);
+    } else {
+      let delta = turns - previous;
+      if (delta > 0.5) delta -= 1;
+      if (delta < -0.5) delta += 1;
+      const samples = Math.max(1, Math.ceil(Math.abs(delta) * 48));
+      for (let i = 1; i <= samples; i++) rubAt(previous + delta * (i / samples));
+    }
+    lastTurns.current = turns;
+  }
+
+  function beginRub(event: ReactPointerEvent<HTMLDivElement>) {
+    event.currentTarget.setPointerCapture(event.pointerId);
+    lastRing.current = null;
+    lastTurns.current = null;
+    rub(event.clientX, event.clientY);
+  }
+
+  function moveRub(event: ReactPointerEvent<HTMLDivElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+    rub(event.clientX, event.clientY);
+  }
+
+  function endRub() {
+    lastRing.current = null;
+    lastTurns.current = null;
+  }
+
   function sweep(direction: 1 | -1) {
     timers.current.forEach((id) => window.clearTimeout(id));
     if (modeRef.current === "guitar" && instrumentRef.current === "drums") {
@@ -211,7 +295,8 @@ export function GratzTune() {
 
   function useMode(next: Mode) {
     setMode(next);
-    if (next === "guitar") stopListening();
+    if (next !== "tuner") stopListening();
+    setRing(null);
   }
 
   async function listen() {
@@ -384,7 +469,7 @@ export function GratzTune() {
             <div className="text-center">
               <p className="text-xs tracking-seal text-brass uppercase">Gratz-Tune</p>
               <h1 className="font-serif text-2xl">
-                {mode === "tuner" ? "Tune" : instrument === "piano" ? "Keys" : instrument === "drums" ? "Kit" : instrument === "flute" ? "Flute" : instrument === "trumpet" ? "Horn" : "Strum"}
+                {mode === "tuner" ? "Tune" : mode === "together" ? "Circle" : instrument === "piano" ? "Keys" : instrument === "drums" ? "Kit" : instrument === "flute" ? "Flute" : instrument === "trumpet" ? "Horn" : "Strum"}
               </h1>
             </div>
             <button
@@ -400,6 +485,53 @@ export function GratzTune() {
           </header>
 
           <div className="hole-fit px-4">
+            {mode === "together" ? (
+              <div
+                ref={ringRef}
+                className="soundhole relative aspect-square touch-none overflow-hidden rounded-full border border-brass/50"
+                onPointerDown={beginRub}
+                onPointerMove={moveRub}
+                onPointerUp={endRub}
+                onPointerCancel={endRub}
+              >
+                <img src="/soundhole.jpg" alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+                <div
+                  className="pointer-events-none absolute inset-0"
+                  style={{
+                    background:
+                      "conic-gradient(from -90deg, rgba(232,220,188,0.22) 0deg 72deg, rgba(12,11,10,0.35) 72deg 144deg, rgba(232,220,188,0.14) 144deg 216deg, rgba(12,11,10,0.4) 216deg 288deg, rgba(196,154,74,0.28) 288deg 360deg)",
+                  }}
+                />
+                {ring != null ? (
+                  <div
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                      background: `conic-gradient(from -90deg, transparent ${ring * 72}deg, rgba(232,220,188,0.5) ${ring * 72}deg ${(ring + 1) * 72}deg, transparent ${(ring + 1) * 72}deg)`,
+                    }}
+                  />
+                ) : null}
+                {CIRCLE.map((name, index) => {
+                  const theta = (index + 0.5) * ((Math.PI * 2) / 5);
+                  return (
+                    <span
+                      key={name}
+                      className={`pointer-events-none absolute text-sm ${ring === index ? "text-brass" : "text-ivory"}`}
+                      style={{
+                        left: `${50 + Math.sin(theta) * 34}%`,
+                        top: `${50 - Math.cos(theta) * 34}%`,
+                        transform: "translate(-50%, -50%)",
+                      }}
+                    >
+                      {name}
+                    </span>
+                  );
+                })}
+                <div className="pointer-events-none absolute top-1/2 left-1/2 flex h-[42%] w-[42%] -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full bg-ink/80 text-center">
+                  <p className="font-serif text-2xl">{CHORDS[chord].name}</p>
+                  <p className="px-3 text-xs text-muted">Rub a circle, or tap a slice.</p>
+                </div>
+              </div>
+            ) : (
             <div className="hole-open soundhole relative aspect-square overflow-hidden rounded-full border border-brass/50">
               <img src="/soundhole.jpg" alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
               {mode === "tuner" || instrument === "guitar" ? (
@@ -488,6 +620,7 @@ export function GratzTune() {
                 </div>
               )}
             </div>
+            )}
           </div>
 
           <div className="shrink-0 px-3 pt-2 pb-4">
@@ -507,6 +640,13 @@ export function GratzTune() {
               ))}
             </div>
             <div className="mx-auto mt-2 flex w-full max-w-3xl gap-2">
+              <button
+                type="button"
+                onClick={() => useMode("together")}
+                className={`min-h-11 flex-1 text-sm ${mode === "together" ? "bg-brass text-ink" : "border border-line text-ivory"}`}
+              >
+                All at once
+              </button>
               <button
                 type="button"
                 onClick={() => useMode("tuner")}
@@ -551,7 +691,7 @@ export function GratzTune() {
               </button>
             </div>
             {shareNote ? <p className="mx-auto mt-2 max-w-3xl text-xs text-brass">{shareNote}</p> : null}
-            {mode === "guitar" ? (
+            {mode !== "tuner" ? (
               <div
                 className="mx-auto mt-3 w-full max-w-3xl rounded-slab border border-line bg-ink/70 px-3 py-3 backdrop-blur"
                 onPointerDown={(event) => {
@@ -608,6 +748,7 @@ export function GratzTune() {
                   </>
                   )}
                 </div>
+                {mode === "together" ? null : (
                 <div className="mt-3 flex gap-2">
                   <button type="button" onClick={() => sweep(1)} className="min-h-11 flex-1 bg-brass text-sm text-ink">
                     {instrument === "drums" ? "Groove" : instrument === "piano" ? "Chord" : instrument === "guitar" ? "Strum down" : "Run up"}
@@ -616,6 +757,7 @@ export function GratzTune() {
                     {instrument === "drums" ? "Fill" : instrument === "piano" ? "Gliss" : instrument === "guitar" ? "Strum up" : "Run down"}
                   </button>
                 </div>
+                )}
               </div>
             ) : (
               <div className="mx-auto mt-3 w-full max-w-3xl rounded-slab border border-line bg-ink/70 px-4 py-3 backdrop-blur">
