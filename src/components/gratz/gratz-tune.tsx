@@ -10,6 +10,19 @@ import {
   type ReferenceHz,
 } from "@/lib/gratz/pitch";
 import { pluck, armAudio, captureStream, tapMic } from "@/lib/gratz/pluck";
+import {
+  DRUMS,
+  INSTRUMENTS,
+  PIANO_MIDIS,
+  isBlackKey,
+  noteLabel,
+  playDrum,
+  playFlute,
+  playPiano,
+  playTrumpet,
+  windMidis,
+  type Instrument,
+} from "@/lib/gratz/voices";
 import { xIntent } from "@/lib/dtc/links";
 
 type Phase = "walk" | "hole";
@@ -53,6 +66,7 @@ const CHORDS: { name: string; frets: number[] }[] = [
 export function GratzTune() {
   const [phase, setPhase] = useState<Phase>("walk");
   const [mode, setMode] = useState<Mode>("guitar");
+  const [instrument, setInstrument] = useState<Instrument>("guitar");
   const [reference, setReference] = useState<ReferenceHz>(432);
   const [chord, setChord] = useState(0);
   const [armed, setArmed] = useState<number | null>(null);
@@ -73,6 +87,7 @@ export function GratzTune() {
   const lastStrum = useRef<number | null>(null);
   const timers = useRef<number[]>([]);
   const modeRef = useRef(mode);
+  const instrumentRef = useRef(instrument);
   const chordRef = useRef(chord);
   const referenceRef = useRef(reference);
   const recRef = useRef<MediaRecorder | null>(null);
@@ -82,6 +97,7 @@ export function GratzTune() {
   const dragX = useRef<number | null>(null);
   const swiped = useRef(false);
   modeRef.current = mode;
+  instrumentRef.current = instrument;
   chordRef.current = chord;
   referenceRef.current = reference;
 
@@ -106,10 +122,29 @@ export function GratzTune() {
     return () => window.clearInterval(id);
   }, [recording]);
 
+  function lanes() {
+    if (modeRef.current === "tuner" || instrumentRef.current === "guitar" || instrumentRef.current === "drums") return 6;
+    if (instrumentRef.current === "piano") return PIANO_MIDIS.length;
+    return 8;
+  }
+
   function sound(index: number, level: number) {
-    const fret = modeRef.current === "guitar" ? CHORDS[chordRef.current].frets[index] : 0;
-    if (fret < 0) return;
-    pluck(stringFreq(STRING_MIDIS[index] + fret, referenceRef.current), level);
+    const inst = instrumentRef.current;
+    const tuning = referenceRef.current;
+    if (modeRef.current === "tuner" || inst === "guitar") {
+      const fret = modeRef.current === "guitar" ? CHORDS[chordRef.current].frets[index] : 0;
+      if (fret < 0) return;
+      pluck(stringFreq(STRING_MIDIS[index] + fret, tuning), level);
+    } else if (inst === "drums") {
+      playDrum(index);
+    } else if (inst === "piano") {
+      playPiano(stringFreq(PIANO_MIDIS[index], tuning));
+    } else {
+      const midi = windMidis(CHORDS[chordRef.current].name, inst)[index];
+      const freq = stringFreq(midi, tuning);
+      if (inst === "flute") playFlute(freq);
+      else playTrumpet(freq);
+    }
     setArmed(index);
     setPings((current) => current.map((count, i) => (i === index ? count + 1 : count)));
   }
@@ -126,7 +161,7 @@ export function GratzTune() {
     const ratio = (clientX - rect.left - padLeft) / inner;
     if (ratio < 0 || ratio > 1) return;
     setPick((padLeft + ratio * inner) / rect.width);
-    const index = Math.min(5, Math.floor(ratio * 6));
+    const index = Math.min(lanes() - 1, Math.floor(ratio * lanes()));
     const previous = lastStrum.current;
     if (previous == null) {
       sound(index, 0.22);
@@ -155,7 +190,22 @@ export function GratzTune() {
 
   function sweep(direction: 1 | -1) {
     timers.current.forEach((id) => window.clearTimeout(id));
-    const order = direction > 0 ? [0, 1, 2, 3, 4, 5] : [5, 4, 3, 2, 1, 0];
+    if (modeRef.current === "guitar" && instrumentRef.current === "drums") {
+      const pattern = direction > 0 ? [0, 2, 1, 2, 0, 2, 1, 4] : [5, 3, 1, 4, 0, 2];
+      timers.current = pattern.map((index, step) => window.setTimeout(() => sound(index, 0.2), step * 120));
+      return;
+    }
+    if (modeRef.current === "guitar" && instrumentRef.current === "piano" && direction > 0) {
+      const midis = CHORDS[chordRef.current].frets.flatMap((fret, index) =>
+        fret < 0 ? [] : [STRING_MIDIS[index] + fret + 12],
+      );
+      timers.current = midis.map(
+        (midi, step) => window.setTimeout(() => playPiano(stringFreq(midi, referenceRef.current)), step * 80),
+      );
+      return;
+    }
+    const count = lanes();
+    const order = Array.from({ length: count }, (_, index) => (direction > 0 ? index : count - 1 - index));
     timers.current = order.map((index, step) => window.setTimeout(() => sound(index, 0.2), step * 46));
   }
 
@@ -282,7 +332,7 @@ export function GratzTune() {
   async function shareOnX() {
     const file = takeFile();
     if (!file) return;
-    const text = `A take from Gratz-Tune. ${CHORDS[chord].name}, A at ${reference} Hz.\n#GratzTune #DarkTradingCompany`;
+    const text = `A ${instrument} take from Gratz-Tune. ${CHORDS[chord].name}, A at ${reference} Hz.\n#GratzTune #DarkTradingCompany`;
     if (navigator.canShare?.({ files: [file] })) {
       try {
         await navigator.share({ files: [file], text, title: "Gratz-Tune" });
@@ -333,7 +383,9 @@ export function GratzTune() {
             </Link>
             <div className="text-center">
               <p className="text-xs tracking-seal text-brass uppercase">Gratz-Tune</p>
-              <h1 className="font-serif text-2xl">{mode === "guitar" ? "Strum" : "Tune"}</h1>
+              <h1 className="font-serif text-2xl">
+                {mode === "tuner" ? "Tune" : instrument === "piano" ? "Keys" : instrument === "drums" ? "Kit" : instrument === "flute" ? "Flute" : instrument === "trumpet" ? "Horn" : "Strum"}
+              </h1>
             </div>
             <button
               type="button"
@@ -350,6 +402,7 @@ export function GratzTune() {
           <div className="hole-fit px-4">
             <div className="hole-open soundhole relative aspect-square overflow-hidden rounded-full border border-brass/50">
               <img src="/soundhole.jpg" alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+              {mode === "tuner" || instrument === "guitar" ? (
               <div
                 ref={rowRef}
                 className="string-row absolute inset-0 flex touch-none"
@@ -388,18 +441,72 @@ export function GratzTune() {
                   );
                 })}
               </div>
+              ) : instrument === "drums" ? (
+                <div className="absolute inset-[16%] grid grid-cols-3 gap-3">
+                  {DRUMS.map((name, index) => (
+                    <button
+                      key={name}
+                      type="button"
+                      onClick={() => sound(index, 0.3)}
+                      onPointerEnter={(event) => {
+                        if (event.buttons === 1) sound(index, 0.3);
+                      }}
+                      className={`rounded-full border text-sm ${active === index ? "bg-brass text-ink" : "border-ivory/40 bg-ink/55 text-ivory"}`}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div
+                  ref={rowRef}
+                  className="absolute inset-[10%] flex touch-none overflow-hidden rounded-slab"
+                  onPointerDown={beginStrum}
+                  onPointerMove={moveStrum}
+                  onPointerUp={endStrum}
+                  onPointerCancel={endStrum}
+                >
+                  {(instrument === "piano" ? PIANO_MIDIS : windMidis(CHORDS[chord].name, instrument)).map((midi, index) => {
+                    const black = instrument === "piano" && isBlackKey(midi);
+                    return (
+                      <button
+                        key={`${midi}-${index}`}
+                        type="button"
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          sound(index, 0.3);
+                        }}
+                        className={`relative min-h-11 flex-1 text-xs ${black ? "self-start bg-ink/85 text-ivory" : "bg-ivory/80 text-ink"}`}
+                        style={black ? { height: "62%" } : undefined}
+                        aria-label={`Play ${noteLabel(midi)}`}
+                      >
+                        <span className="mt-4 block">{noteLabel(midi)}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
 
           <div className="shrink-0 px-3 pt-2 pb-4">
-            <div className="mx-auto flex w-full max-w-3xl gap-2">
-              <button
-                type="button"
-                onClick={() => useMode("guitar")}
-                className={`min-h-11 flex-1 text-sm ${mode === "guitar" ? "bg-brass text-ink" : "border border-line text-ivory"}`}
-              >
-                Guitar
-              </button>
+            <div className="mx-auto grid w-full max-w-3xl grid-cols-5 gap-2">
+              {INSTRUMENTS.map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    setInstrument(id);
+                    useMode("guitar");
+                  }}
+                  className={`min-h-11 text-sm capitalize ${mode === "guitar" && instrument === id ? "bg-brass text-ink" : "border border-line text-ivory"}`}
+                >
+                  {id}
+                </button>
+              ))}
+            </div>
+            <div className="mx-auto mt-2 flex w-full max-w-3xl gap-2">
               <button
                 type="button"
                 onClick={() => useMode("tuner")}
@@ -467,6 +574,10 @@ export function GratzTune() {
                   </p>
                 </div>
                 <div className="mt-2 flex items-center gap-2">
+                  {instrument === "drums" ? (
+                    <p className="min-h-11 flex-1 text-sm text-muted">Tap a pad, or drag across the kit.</p>
+                  ) : (
+                  <>
                   <button type="button" onClick={() => shiftPage(-1)} className="min-h-11 min-w-11 border border-line text-ivory" aria-label="Earlier chords">
                     ‹
                   </button>
@@ -494,13 +605,15 @@ export function GratzTune() {
                   <button type="button" onClick={() => shiftPage(1)} className="min-h-11 min-w-11 border border-line text-ivory" aria-label="Later chords">
                     ›
                   </button>
+                  </>
+                  )}
                 </div>
                 <div className="mt-3 flex gap-2">
                   <button type="button" onClick={() => sweep(1)} className="min-h-11 flex-1 bg-brass text-sm text-ink">
-                    Strum down
+                    {instrument === "drums" ? "Groove" : instrument === "piano" ? "Chord" : instrument === "guitar" ? "Strum down" : "Run up"}
                   </button>
                   <button type="button" onClick={() => sweep(-1)} className="min-h-11 flex-1 border border-line text-sm text-ivory">
-                    Strum up
+                    {instrument === "drums" ? "Fill" : instrument === "piano" ? "Gliss" : instrument === "guitar" ? "Strum up" : "Run down"}
                   </button>
                 </div>
               </div>

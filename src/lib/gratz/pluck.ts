@@ -18,6 +18,12 @@ function graph() {
   return { audio, master, capture };
 }
 
+export function withBus() {
+  const { audio, master } = graph();
+  void audio.resume();
+  return { audio, master };
+}
+
 export function armAudio() {
   const audio = context();
   void audio.resume();
