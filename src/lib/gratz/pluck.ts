@@ -1,12 +1,43 @@
 let ctx: AudioContext | null = null;
+let master: GainNode | null = null;
+let capture: MediaStreamAudioDestinationNode | null = null;
 
 function context() {
   if (!ctx) ctx = new AudioContext();
   return ctx;
 }
 
-export function pluck(freq: number, level = 0.32) {
+function graph() {
   const audio = context();
+  if (!master || !capture) {
+    master = audio.createGain();
+    master.connect(audio.destination);
+    capture = audio.createMediaStreamDestination();
+    master.connect(capture);
+  }
+  return { audio, master, capture };
+}
+
+export function armAudio() {
+  const audio = context();
+  void audio.resume();
+  graph();
+  return audio;
+}
+
+export function captureStream() {
+  return graph().capture.stream;
+}
+
+export function tapMic(stream: MediaStream) {
+  const { audio, capture: bus } = graph();
+  const source = audio.createMediaStreamSource(stream);
+  source.connect(bus);
+  return () => source.disconnect();
+}
+
+export function pluck(freq: number, level = 0.32) {
+  const { audio, master: bus } = graph();
   void audio.resume();
   const duration = 2.2;
   const rate = audio.sampleRate;
@@ -24,6 +55,6 @@ export function pluck(freq: number, level = 0.32) {
   gain.gain.setValueAtTime(level, audio.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + duration);
   source.connect(gain);
-  gain.connect(audio.destination);
+  gain.connect(bus);
   source.start();
 }

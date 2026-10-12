@@ -9,18 +9,45 @@ import {
   stringFreq,
   type ReferenceHz,
 } from "@/lib/gratz/pitch";
-import { pluck } from "@/lib/gratz/pluck";
+import { pluck, armAudio, captureStream, tapMic } from "@/lib/gratz/pluck";
+import { xIntent } from "@/lib/dtc/links";
 
 type Phase = "walk" | "hole";
 type Mode = "guitar" | "tuner";
 
+const PAGE = 10;
+
 const CHORDS: { name: string; frets: number[] }[] = [
   { name: "Open", frets: [0, 0, 0, 0, 0, 0] },
   { name: "Em", frets: [0, 2, 2, 0, 0, 0] },
+  { name: "E", frets: [0, 2, 2, 1, 0, 0] },
   { name: "G", frets: [3, 2, 0, 0, 0, 3] },
   { name: "C", frets: [-1, 3, 2, 0, 1, 0] },
   { name: "D", frets: [-1, -1, 0, 2, 3, 2] },
   { name: "Am", frets: [-1, 0, 2, 2, 1, 0] },
+  { name: "A", frets: [-1, 0, 2, 2, 2, 0] },
+  { name: "Dm", frets: [-1, -1, 0, 2, 3, 1] },
+  { name: "F", frets: [-1, -1, 3, 2, 1, 1] },
+  { name: "Em7", frets: [0, 2, 2, 0, 3, 0] },
+  { name: "E7", frets: [0, 2, 0, 1, 0, 0] },
+  { name: "G7", frets: [3, 2, 0, 0, 0, 1] },
+  { name: "C7", frets: [-1, 3, 2, 3, 1, 0] },
+  { name: "D7", frets: [-1, -1, 0, 2, 1, 2] },
+  { name: "A7", frets: [-1, 0, 2, 0, 2, 0] },
+  { name: "Am7", frets: [-1, 0, 2, 0, 1, 0] },
+  { name: "Dm7", frets: [-1, -1, 0, 2, 1, 1] },
+  { name: "B7", frets: [-1, 2, 1, 2, 0, 2] },
+  { name: "Asus2", frets: [-1, 0, 2, 2, 0, 0] },
+  { name: "Cmaj7", frets: [-1, 3, 2, 0, 0, 0] },
+  { name: "Dmaj7", frets: [-1, -1, 0, 2, 2, 2] },
+  { name: "Amaj7", frets: [-1, 0, 2, 1, 2, 0] },
+  { name: "Fmaj7", frets: [-1, -1, 3, 2, 1, 0] },
+  { name: "Esus4", frets: [0, 2, 2, 2, 0, 0] },
+  { name: "Asus4", frets: [-1, 0, 2, 2, 3, 0] },
+  { name: "Dsus4", frets: [-1, -1, 0, 2, 3, 3] },
+  { name: "G6", frets: [3, 2, 0, 0, 0, 0] },
+  { name: "Cadd9", frets: [-1, 3, 2, 0, 3, 0] },
+  { name: "Dadd9", frets: [-1, -1, 0, 2, 3, 0] },
 ];
 
 export function GratzTune() {
@@ -35,6 +62,11 @@ export function GratzTune() {
   const [micError, setMicError] = useState<string | null>(null);
   const [walkKey, setWalkKey] = useState(0);
   const [pick, setPick] = useState<number | null>(null);
+  const [page, setPage] = useState(0);
+  const [recording, setRecording] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const [take, setTake] = useState<Blob | null>(null);
+  const [shareNote, setShareNote] = useState<string | null>(null);
   const stopRef = useRef(0);
   const streamRef = useRef<MediaStream | null>(null);
   const rowRef = useRef<HTMLDivElement>(null);
@@ -43,6 +75,12 @@ export function GratzTune() {
   const modeRef = useRef(mode);
   const chordRef = useRef(chord);
   const referenceRef = useRef(reference);
+  const recRef = useRef<MediaRecorder | null>(null);
+  const chunks = useRef<Blob[]>([]);
+  const recordingRef = useRef(false);
+  const micTap = useRef<(() => void) | null>(null);
+  const dragX = useRef<number | null>(null);
+  const swiped = useRef(false);
   modeRef.current = mode;
   chordRef.current = chord;
   referenceRef.current = reference;
@@ -57,8 +95,16 @@ export function GratzTune() {
       stopRef.current += 1;
       streamRef.current?.getTracks().forEach((track) => track.stop());
       timers.current.forEach((id) => window.clearTimeout(id));
+      micTap.current?.();
+      recRef.current?.stop();
     };
   }, []);
+
+  useEffect(() => {
+    if (!recording) return;
+    const id = window.setInterval(() => setSeconds((value) => value + 1), 1000);
+    return () => window.clearInterval(id);
+  }, [recording]);
 
   function sound(index: number, level: number) {
     const fret = modeRef.current === "guitar" ? CHORDS[chordRef.current].frets[index] : 0;
@@ -131,6 +177,10 @@ export function GratzTune() {
         return;
       }
       streamRef.current = stream;
+      if (recordingRef.current) {
+        micTap.current?.();
+        micTap.current = tapMic(stream);
+      }
       const audio = new AudioContext();
       const source = audio.createMediaStreamSource(stream);
       const analyser = audio.createAnalyser();
@@ -162,7 +212,88 @@ export function GratzTune() {
 
   function stopListening() {
     stopRef.current += 1;
+    micTap.current?.();
+    micTap.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setListening(false);
+  }
+
+  function shiftPage(direction: number) {
+    const pages = Math.ceil(CHORDS.length / PAGE);
+    setPage((current) => (current + direction + pages) % pages);
+  }
+
+  function startRecording() {
+    armAudio();
+    const stream = captureStream();
+    if (streamRef.current) {
+      micTap.current?.();
+      micTap.current = tapMic(streamRef.current);
+    }
+    const mime = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"].find((type) => MediaRecorder.isTypeSupported(type));
+    let recorder: MediaRecorder;
+    try {
+      recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    } catch {
+      setShareNote("This browser cannot record audio.");
+      return;
+    }
+    chunks.current = [];
+    recorder.ondataavailable = (event) => {
+      if (event.data.size) chunks.current.push(event.data);
+    };
+    recorder.onstop = () => {
+      setTake(new Blob(chunks.current, { type: recorder.mimeType || "audio/webm" }));
+      setRecording(false);
+      recordingRef.current = false;
+    };
+    recorder.start();
+    recRef.current = recorder;
+    recordingRef.current = true;
+    setSeconds(0);
+    setTake(null);
+    setShareNote(null);
+    setRecording(true);
+  }
+
+  function stopRecording() {
+    if (recRef.current && recRef.current.state !== "inactive") recRef.current.stop();
+  }
+
+  function takeFile() {
+    if (!take) return null;
+    const ext = take.type.includes("mp4") ? "m4a" : "webm";
+    return new File([take], `gratz-tune.${ext}`, { type: take.type || "audio/webm" });
+  }
+
+  function saveLocal() {
+    const file = takeFile();
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = file.name;
+    link.click();
+    URL.revokeObjectURL(url);
+    setShareNote("Saved on this device.");
+  }
+
+  async function shareOnX() {
+    const file = takeFile();
+    if (!file) return;
+    const text = `A take from Gratz-Tune. ${CHORDS[chord].name}, A at ${reference} Hz.\n#GratzTune #DarkTradingCompany`;
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({ files: [file], text, title: "Gratz-Tune" });
+        return;
+      } catch {
+        return;
+      }
+    }
+    saveLocal();
+    window.open(xIntent(text), "_blank", "noopener,noreferrer");
+    setShareNote("X cannot take the file from the browser. It is saved — attach it to the post.");
   }
 
   const frets = CHORDS[chord].frets;
@@ -195,8 +326,8 @@ export function GratzTune() {
           </div>
         </div>
       ) : (
-        <div className="relative z-10 h-full">
-          <header className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 px-4 py-3">
+        <div className="relative z-10 flex h-full flex-col">
+          <header className="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
             <Link to="/" className="min-h-11 text-sm text-ivory">
               Desk
             </Link>
@@ -216,7 +347,7 @@ export function GratzTune() {
             </button>
           </header>
 
-          <div className="flex h-full items-center justify-center">
+          <div className="hole-fit px-4">
             <div className="hole-open soundhole relative aspect-square overflow-hidden rounded-full border border-brass/50">
               <img src="/soundhole.jpg" alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
               <div
@@ -260,8 +391,8 @@ export function GratzTune() {
             </div>
           </div>
 
-          <div className="absolute inset-x-0 bottom-0 z-20 mx-auto w-full max-w-md px-4 pt-3 pb-4">
-            <div className="flex gap-2">
+          <div className="shrink-0 px-3 pt-2 pb-4">
+            <div className="mx-auto flex w-full max-w-3xl gap-2">
               <button
                 type="button"
                 onClick={() => useMode("guitar")}
@@ -276,8 +407,15 @@ export function GratzTune() {
               >
                 Tuner
               </button>
+              <button
+                type="button"
+                onClick={() => (recording ? stopRecording() : startRecording())}
+                className={`min-h-11 flex-1 text-sm ${recording ? "bg-ivory text-ink" : "bg-brass text-ink"}`}
+              >
+                {recording ? `Stop ${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}` : "Record"}
+              </button>
             </div>
-            <div className="mt-2 flex gap-2">
+            <div className="mx-auto mt-2 flex w-full max-w-3xl gap-2">
               {([432, 428] as const).map((hz) => (
                 <button
                   key={hz}
@@ -288,22 +426,74 @@ export function GratzTune() {
                   A at {hz}
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={saveLocal}
+                disabled={!take || recording}
+                className="min-h-11 flex-1 border border-line text-sm text-ivory disabled:opacity-40"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => void shareOnX()}
+                disabled={!take || recording}
+                className="min-h-11 flex-1 border border-line text-sm text-ivory disabled:opacity-40"
+              >
+                Post on X
+              </button>
             </div>
+            {shareNote ? <p className="mx-auto mt-2 max-w-3xl text-xs text-brass">{shareNote}</p> : null}
             {mode === "guitar" ? (
-              <div className="mt-3 rounded-slab border border-line bg-ink/70 px-4 py-3 backdrop-blur">
-                <p className="font-serif text-xl">{CHORDS[chord].name}</p>
-                <p className="mt-1 text-xs text-muted">Drag across the hole. Muted strings stay quiet.</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {CHORDS.map((item, index) => (
-                    <button
-                      key={item.name}
-                      type="button"
-                      onClick={() => setChord(index)}
-                      className={`min-h-11 px-3 text-sm ${chord === index ? "bg-brass text-ink" : "border border-line text-ivory"}`}
-                    >
-                      {item.name}
-                    </button>
-                  ))}
+              <div
+                className="mx-auto mt-3 w-full max-w-3xl rounded-slab border border-line bg-ink/70 px-3 py-3 backdrop-blur"
+                onPointerDown={(event) => {
+                  dragX.current = event.clientX;
+                  swiped.current = false;
+                }}
+                onPointerUp={(event) => {
+                  if (dragX.current == null) return;
+                  const delta = event.clientX - dragX.current;
+                  dragX.current = null;
+                  if (Math.abs(delta) < 48) return;
+                  swiped.current = true;
+                  shiftPage(delta < 0 ? 1 : -1);
+                }}
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-serif text-xl">{CHORDS[chord].name}</p>
+                  <p className="text-xs text-muted">
+                    {page * PAGE + 1}–{Math.min(CHORDS.length, page * PAGE + PAGE)} of {CHORDS.length}
+                  </p>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <button type="button" onClick={() => shiftPage(-1)} className="min-h-11 min-w-11 border border-line text-ivory" aria-label="Earlier chords">
+                    ‹
+                  </button>
+                  <div className="grid flex-1 grid-cols-5 gap-2">
+                    {CHORDS.slice(page * PAGE, page * PAGE + PAGE).map((item, offset) => {
+                      const index = page * PAGE + offset;
+                      return (
+                        <button
+                          key={item.name}
+                          type="button"
+                          onClick={() => {
+                            if (swiped.current) {
+                              swiped.current = false;
+                              return;
+                            }
+                            setChord(index);
+                          }}
+                          className={`min-h-11 px-1 text-sm ${chord === index ? "bg-brass text-ink" : "border border-line text-ivory"}`}
+                        >
+                          {item.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button type="button" onClick={() => shiftPage(1)} className="min-h-11 min-w-11 border border-line text-ivory" aria-label="Later chords">
+                    ›
+                  </button>
                 </div>
                 <div className="mt-3 flex gap-2">
                   <button type="button" onClick={() => sweep(1)} className="min-h-11 flex-1 bg-brass text-sm text-ink">
@@ -315,7 +505,7 @@ export function GratzTune() {
                 </div>
               </div>
             ) : (
-              <div className="mt-3 rounded-slab border border-line bg-ink/70 px-4 py-3 backdrop-blur">
+              <div className="mx-auto mt-3 w-full max-w-3xl rounded-slab border border-line bg-ink/70 px-4 py-3 backdrop-blur">
                 <div className="flex items-baseline justify-between gap-3">
                   <p className="font-serif text-xl">
                     {active == null || target == null ? "Tap a string" : `${STRING_NAMES[active]} · ${target.toFixed(2)} Hz`}

@@ -291,9 +291,17 @@
   animation: hole-open 800ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+.hole-fit {
+  container-type: size;
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  place-items: center;
+}
+
 .soundhole {
-  width: min(96vw, 92vh);
-  max-width: 96vw;
+  width: min(100cqw, 100cqh, 96vw);
+  height: min(100cqw, 100cqh, 96vw);
 }
 
 .string-row {
