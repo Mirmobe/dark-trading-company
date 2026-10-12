@@ -14,7 +14,6 @@ import {
   DRUMS,
   INSTRUMENTS,
   PIANO_MIDIS,
-  isBlackKey,
   noteLabel,
   playDrum,
   playFlute,
@@ -41,6 +40,15 @@ type Phase = "walk" | "hole";
 type Mode = "guitar" | "tuner" | "together" | "deck";
 
 const CIRCLE = ["Guitar", "Piano", "Flute", "Trumpet", "Drums"] as const;
+
+const DRUM_ART = [
+  "/drum-kick.jpg",
+  "/drum-snare.jpg",
+  "/drum-hat.jpg",
+  "/drum-open.jpg",
+  "/drum-tom.jpg",
+  "/drum-clap.jpg",
+];
 
 const PAGE = 10;
 
@@ -581,7 +589,7 @@ export function GratzTune() {
             </button>
           </header>
 
-          <div className="hole-fit px-4">
+          <div className="hole-fit">
             {mode === "deck" ? (
               <div
                 className="soundhole relative aspect-square touch-none overflow-hidden rounded-full border border-brass/60"
@@ -647,74 +655,77 @@ export function GratzTune() {
                 </div>
               </div>
             ) : (
-            <div className="hole-open soundhole relative aspect-square overflow-hidden rounded-full border border-brass/50">
-              <img src="/soundhole.jpg" alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
-              {mode === "tuner" || instrument === "guitar" ? (
+            <div className="play-bed relative overflow-hidden bg-ink">
+              <img
+                src={
+                  mode === "tuner" || instrument === "guitar"
+                    ? "/guitar-strings.jpg"
+                    : instrument === "piano"
+                      ? "/piano-keys.jpg"
+                      : instrument === "flute"
+                        ? "/flute.jpg"
+                        : instrument === "drums"
+                          ? "/drum-snare.jpg"
+                          : "/trumpet.jpg"
+                }
+                alt=""
+                className={`pointer-events-none absolute inset-0 h-full w-full ${instrument === "drums" && mode !== "tuner" ? "object-cover opacity-20" : "object-cover"}`}
+              />
               <div
                 ref={rowRef}
-                className="string-row absolute inset-0 flex touch-none"
+                className="absolute inset-0 flex touch-none"
                 onPointerDown={beginStrum}
                 onPointerMove={moveStrum}
                 onPointerUp={endStrum}
                 onPointerCancel={endStrum}
               >
                 {pick != null ? (
-                  <span className="pointer-events-none absolute top-[8%] bottom-[8%] w-px bg-brass" style={{ left: `${pick * 100}%` }} />
+                  <span className="pointer-events-none absolute top-0 bottom-0 z-10 w-0.5 bg-brass" style={{ left: `${pick * 100}%` }} />
                 ) : null}
-                {STRING_NAMES.map((name, index) => {
-                  const fret = mode === "guitar" ? frets[index] : 0;
-                  const freq = fret < 0 ? null : stringFreq(STRING_MIDIS[index] + fret, reference);
-                  const hot = active === index;
-                  return (
+                {mode === "tuner" || instrument === "guitar" ? (
+                  STRING_NAMES.map((name, index) => {
+                    const fret = mode === "guitar" ? frets[index] : 0;
+                    const freq = fret < 0 ? null : stringFreq(STRING_MIDIS[index] + fret, reference);
+                    const hot = active === index;
+                    return (
+                      <button
+                        key={name + index}
+                        type="button"
+                        onKeyDown={(event) => {
+                          if (event.key !== "Enter" && event.key !== " ") return;
+                          event.preventDefault();
+                          sound(index, 0.3);
+                        }}
+                        className={`relative flex h-full min-h-11 flex-1 flex-col items-center pt-4 ${hot ? "bg-brass/30" : ""}`}
+                        aria-label={freq == null ? `${name} muted` : `Play ${name} at ${freq.toFixed(1)} hertz`}
+                      >
+                        <span className="bg-ink/80 px-2 py-1 font-serif text-lg text-ivory">{freq == null ? `${name} mute` : name}</span>
+                      </button>
+                    );
+                  })
+                ) : instrument === "drums" ? (
+                  DRUMS.map((name, index) => (
                     <button
-                      key={name + index}
+                      key={name}
                       type="button"
                       onKeyDown={(event) => {
                         if (event.key !== "Enter" && event.key !== " ") return;
                         event.preventDefault();
                         sound(index, 0.3);
                       }}
-                      className="relative flex h-full min-h-11 flex-1 flex-col items-center pt-16"
-                      aria-label={freq == null ? `${name} muted` : `Play ${name} at ${freq.toFixed(1)} hertz`}
+                      className="relative flex h-full min-h-11 flex-1 flex-col items-center justify-center gap-2"
+                      aria-label={`Play ${name}`}
                     >
-                      <span className={`text-xs ${hot ? "text-brass" : "text-ivory"}`}>{name}</span>
-                      <span className="num text-xs text-ivory/80">{freq == null ? "×" : freq.toFixed(1)}</span>
                       <span
-                        key={pings[index]}
-                        className="string-ping string-line absolute bg-ivory"
-                        style={{ width: `${3.6 - index * 0.38}px`, opacity: fret < 0 ? 0.25 : hot ? 1 : 0.8 }}
+                        className={`block aspect-square w-[78%] max-w-40 rounded-full bg-cover bg-center ${active === index ? "ring-4 ring-brass" : "ring-2 ring-ivory/70"}`}
+                        style={{ backgroundImage: `url(${DRUM_ART[index]})` }}
                       />
+                      <span className="bg-ink/85 px-2 py-1 font-serif text-lg text-ivory">{name}</span>
                     </button>
-                  );
-                })}
-              </div>
-              ) : instrument === "drums" ? (
-                <div className="absolute inset-[16%] grid grid-cols-3 gap-3">
-                  {DRUMS.map((name, index) => (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => sound(index, 0.3)}
-                      onPointerEnter={(event) => {
-                        if (event.buttons === 1) sound(index, 0.3);
-                      }}
-                      className={`rounded-full border text-sm ${active === index ? "bg-brass text-ink" : "border-ivory/40 bg-ink/55 text-ivory"}`}
-                    >
-                      {name}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div
-                  ref={rowRef}
-                  className="absolute inset-[10%] flex touch-none overflow-hidden rounded-slab"
-                  onPointerDown={beginStrum}
-                  onPointerMove={moveStrum}
-                  onPointerUp={endStrum}
-                  onPointerCancel={endStrum}
-                >
-                  {(instrument === "piano" ? PIANO_MIDIS : windMidis(CHORDS[chord].name, instrument)).map((midi, index) => {
-                    const black = instrument === "piano" && isBlackKey(midi);
+                  ))
+                ) : (
+                  (instrument === "piano" ? PIANO_MIDIS : windMidis(CHORDS[chord].name, instrument)).map((midi, index) => {
+                    const hot = active === index;
                     return (
                       <button
                         key={`${midi}-${index}`}
@@ -724,16 +735,23 @@ export function GratzTune() {
                           event.preventDefault();
                           sound(index, 0.3);
                         }}
-                        className={`relative min-h-11 flex-1 text-xs ${black ? "self-start bg-ink/85 text-ivory" : "bg-ivory/80 text-ink"}`}
-                        style={black ? { height: "62%" } : undefined}
+                        className={`relative flex h-full min-h-11 flex-1 flex-col items-center justify-end pb-4 ${hot ? "bg-brass/25" : ""}`}
                         aria-label={`Play ${noteLabel(midi)}`}
                       >
-                        <span className="mt-4 block">{noteLabel(midi)}</span>
+                        <span className="bg-ink/75 px-1 py-1 font-serif text-base text-ivory">{noteLabel(midi)}</span>
                       </button>
                     );
-                  })}
+                  })
+                )}
+              </div>
+              {mode !== "tuner" && (instrument === "trumpet" || instrument === "flute") ? (
+                <div className="pointer-events-none absolute inset-x-6 bottom-[22%] h-4 rounded-full bg-brass/80">
+                  <span
+                    className="absolute top-1/2 h-10 w-10 -translate-y-1/2 rounded-full border-4 border-brass bg-ivory"
+                    style={{ left: `${(pick ?? 0.08) * 100}%` }}
+                  />
                 </div>
-              )}
+              ) : null}
             </div>
             )}
           </div>
@@ -748,7 +766,7 @@ export function GratzTune() {
                     setInstrument(id);
                     useMode("guitar");
                   }}
-                  className={`min-h-11 text-sm capitalize ${mode === "guitar" && instrument === id ? "bg-brass text-ink" : "border border-line text-ivory"}`}
+                  className={`min-h-16 rounded-slab font-serif text-xl capitalize ${mode === "guitar" && instrument === id ? "bg-brass text-ink" : "border-2 border-brass bg-ink text-ivory"}`}
                 >
                   {id}
                 </button>

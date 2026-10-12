@@ -299,6 +299,13 @@
   place-items: center;
 }
 
+.play-bed {
+  width: 100%;
+  height: 100%;
+  justify-self: stretch;
+  align-self: stretch;
+}
+
 .soundhole {
   width: min(100cqw, 100cqh, 96vw);
   height: min(100cqw, 100cqh, 96vw);
